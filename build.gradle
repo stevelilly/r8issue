@@ -1,0 +1,21 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+        maven {
+            url "https://storage.googleapis.com/r8-releases/raw"
+        }
+    }
+    dependencies {
+        // (UN)COMMENT THE FOLLOWING to demonstrate the change in behaviour
+//        classpath "com.android.tools:r8:3.0.25-dev"  // This has to be before com.android.tools.build:gradle
+
+        classpath "com.android.tools.build:gradle:7.0.0-rc01"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.5.20"
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
