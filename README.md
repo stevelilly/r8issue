@@ -74,7 +74,17 @@ com.twilio.auth.internal.authy.api.RegistrationApi$a -> a.a.a.c.c.a.a$a:
 etc
 ```
 
-# Footnote
+## Scanning for plaintext packages
+
+Included in the repo is the script `r8scan.py`, which will filter the `mapping.txt` looking for unmapped package prefixes, e.g:
+
+```
+$ ./r8scan.py < app/build/outputs/mapping/release/mapping.txt
+com.example.r8issue.MainActivity
+com.twilio.auth.internal.authy.api
+```
+
+## Footnote
 
 One thing I notice is that this Twilio package has been partially obfuscated already, there is another class `com.twilio.auth.internal.authy.api.f` not in the map file that is inside the APK.
 Has it perhaps by chance remapped class f -> f, then concluded that the class was "kept", and therefore needed to preserve the complete package name?
