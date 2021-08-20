@@ -8,11 +8,10 @@ buildscript {
         }
     }
     dependencies {
-        // (UN)COMMENT THE FOLLOWING to demonstrate the change in behaviour
-//        classpath "com.android.tools:r8:3.0.25-dev"  // This has to be before com.android.tools.build:gradle
-
-        classpath "com.android.tools.build:gradle:7.0.0-rc01"
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.5.20"
+        // Include local build of R8 here, e.g.
+        classpath files("/Users/steve.lilly/r8/build/libs/r8.jar")
+        classpath "com.android.tools.build:gradle:7.0.1"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.4.21"
     }
 }
 

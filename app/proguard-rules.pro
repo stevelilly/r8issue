@@ -5,3 +5,5 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
+# Uncomment to demonstrate issue where package cannot be renamed despite "allowobfuscation"
+-keep,allowobfuscation class com.twilio.auth.external.** { *; }

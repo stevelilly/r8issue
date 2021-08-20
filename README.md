@@ -1,92 +1,60 @@
-
 This repository is to demonstrate an unexpected behaviour with package obfuscation we have seen in R8 since the introduction of flattened packages.
-While we note that some similar looking bugs have been fixed, this example is apparently still occurring as of R8 3.0.62 that ships with Android Gradle Plugin 7.0.0-rc01
 
 This example is a little contrived, but it's the first example from our actual app build I've been able to consistently reproduce in an sandbox project.
 The `libs/com.twilio-authenticator-1.2.9.jar` file is the raw `classes.jar` file found inside [https://repo1.maven.org/maven2/com/twilio/authenticator/1.2.9/authenticator-1.2.9.aar].
-As such it includes no consumer `proguard.txt` from the AAR file. Nor does this example repository have any rules inside its `proguard-rules.pro`.
+As such it includes no consumer `proguard.txt` from the AAR file.
 
-Building with
+# Reproduction
 
-```
-./gradlew app:assembleRelease
-```
+Set the classpath to local build of R8 in `./build.gradle`
 
-Then examining some relevant parts of the map file:
-
-```
-grep "^com.twilio" app/build/outputs/mapping/release/mapping.txt
-```
-
-The first few classes look obfuscated normally:
+Building with R8 from commit `b87d2df7cff717e4b828c24ac19847413677f58b`:
+(or with 3.0.64 from AGP 7.0.1)
 
 ```
-com.twilio.auth.TwilioAuth -> a.a:
-com.twilio.auth.a -> a.b:
-com.twilio.auth.internal.a -> b.a:
-com.twilio.auth.internal.a.b.b -> c.a:
+$ ./gradlew app:assembleRelease
+$ grep "^com.twilio.auth.external" app/build/outputs/mapping/release/mapping.txt
+com.twilio.auth.external.ApprovalRequest -> b.a:
+com.twilio.auth.external.ApprovalRequestLogo -> b.b:
+com.twilio.auth.external.ApprovalRequestStatus -> b.c:
+com.twilio.auth.external.ApprovalRequests -> b.d:
+com.twilio.auth.external.TOTPCallback -> b.e:
+com.twilio.auth.external.TimeInterval -> b.f:
+com.twilio.auth.external.TimeInterval$1 -> b.f$a:
+com.twilio.auth.external.TimeInterval$Builder -> b.f$b:
 ```
 
-However, this package name is for some reason not obfuscated, despite all classes inside it being obfuscated:
+Classes are repackaged as expected.
+
+Now doing the same thing with the next R8 commit `f53c90005e6f7201162f8e2b4eb4c94a79626f51`:
+(or the latest at time of writing, `685a8c81f`)
 
 ```
-com.twilio.auth.internal.authy.api.RegistrationApi -> com.twilio.auth.internal.authy.api.a:
-com.twilio.auth.internal.authy.api.RegistrationApi$a -> com.twilio.auth.internal.authy.api.a$a:
-com.twilio.auth.internal.authy.api.SdkApi -> com.twilio.auth.internal.authy.api.b:
-com.twilio.auth.internal.authy.api.SdkApi$a -> com.twilio.auth.internal.authy.api.b$a:
-com.twilio.auth.internal.authy.api.a -> com.twilio.auth.internal.authy.api.c:
-com.twilio.auth.internal.authy.api.b -> com.twilio.auth.internal.authy.api.d:
-com.twilio.auth.internal.authy.api.c -> com.twilio.auth.internal.authy.api.e:
-com.twilio.auth.internal.authy.api.h -> com.twilio.auth.internal.authy.api.g:
-com.twilio.auth.internal.authy.api.i -> com.twilio.auth.internal.authy.api.h:
-com.twilio.auth.internal.authy.api.j -> com.twilio.auth.internal.authy.api.i:
+$ ./gradlew app:assembleRelease
+$ grep "^com.twilio.auth.external" app/build/outputs/mapping/release/mapping.txt
+com.twilio.auth.external.ApprovalRequest -> com.twilio.auth.external.a:
+com.twilio.auth.external.ApprovalRequestLogo -> com.twilio.auth.external.b:
+com.twilio.auth.external.ApprovalRequestStatus -> com.twilio.auth.external.c:
+com.twilio.auth.external.ApprovalRequests -> com.twilio.auth.external.d:
+com.twilio.auth.external.TOTPCallback -> com.twilio.auth.external.e:
+com.twilio.auth.external.TimeInterval -> com.twilio.auth.external.f:
+com.twilio.auth.external.TimeInterval$1 -> com.twilio.auth.external.f$a:
+com.twilio.auth.external.TimeInterval$Builder -> com.twilio.auth.external.f$b:
 ```
 
-The behaviour I expect is that since there is no unobfuscated class name inside the `com.twilio.auth.internal.authy.api` package, that package name ought to be eligible for obfuscation as well.
-
-To compare with R8's behaviour before package flattening was introduced, 
-if we now declare an older version of R8 in `build.gradle`:
+Now after removing following line in `proguard-rules.pro`:
 
 ```
-dependencies {
-        classpath "com.android.tools:r8:3.0.25-dev"  // This has to be before com.android.tools.build:gradle
-        classpath "com.android.tools.build:gradle:7.0.0-rc01"
-}
+-keep,allowobfuscation class com.twilio.auth.external.** { *; }
 ```
 
-Running again:
+And checking again:
 
 ```
-./gradlew app:assembleRelease
-grep "^com.twilio" app/build/outputs/mapping/release/mapping.txt
+$ ./gradlew app:assembleRelease
+$ grep "^com.twilio.auth.external" app/build/outputs/mapping/release/mapping.txt
+com.twilio.auth.external.ApprovalRequest -> b.a:
 ```
 
-Now all the mappings look properly obfuscated (albeit without package flattening):
-
-```
-com.twilio.auth.TwilioAuth -> a.a.a.a:
-com.twilio.auth.a -> a.a.a.b:
-com.twilio.auth.internal.a -> a.a.a.c.b:
-com.twilio.auth.internal.a.a -> a.a.a.c.a.a:
-com.twilio.auth.internal.a.b.b -> a.a.a.c.a.b.a:
-com.twilio.auth.internal.authy.api.RegistrationApi -> a.a.a.c.c.a.a:
-com.twilio.auth.internal.authy.api.RegistrationApi$a -> a.a.a.c.c.a.a$a:
-etc
-```
-
-## Scanning for plaintext packages
-
-Included in the repo is the script `r8scan.py`, which will filter the `mapping.txt` looking for unmapped package prefixes, e.g:
-
-```
-$ ./r8scan.py < app/build/outputs/mapping/release/mapping.txt
-com.example.r8issue.MainActivity
-com.twilio.auth.internal.authy.api
-```
-
-## Footnote
-
-One thing I notice is that this Twilio package has been partially obfuscated already, there is another class `com.twilio.auth.internal.authy.api.f` not in the map file that is inside the APK.
-Has it perhaps by chance remapped class f -> f, then concluded that the class was "kept", and therefore needed to preserve the complete package name?
-
-However, for reasons I can't yet explain, in our main app build the problem package is `com.twilio.auth.external` not `com.twilio.auth.internal`, inside that there are no already obfuscated class names, and yet the issue with unecessarily unobfuscated package names persists.
+Expected behaviour: -keep,allowobfuscation should allow both the class and package name to be changed within `com.twilio.auth.external.**`
+Actual behaviour: classes inside `com.twilio.auth.external` are renamed, yet the package name is kept
